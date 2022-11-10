@@ -170,6 +170,35 @@ module.exports = {
     let userInfo = await User.findById(ad.idUser).exec();
     let stateInfo = await StateModel.findById(ad.state).exec();
 
+    let others = [];
+
+    if (other) {
+      const otherData = await Ad.find({
+        status: true,
+        idUser: ad.idUser,
+      }).exec();
+
+      for (let i in otherData) {
+        if (otherData[i]._id.toString() != ad._id.toString()) {
+          let image = `${process.env.BASE}/media/default.jpg`;
+
+          let defaultImg = otherData[i].images.find((e) => e.default);
+          if (defaultImg) {
+            image = `${process.env.BASE}/media/${defaultImg.url}`;
+          }
+
+          others.push({
+            id: otherData[i]._id,
+            title: otherData[i]._title,
+            price: otherData[i].price,
+            price: otherData[i].price,
+            priceNegotiable: otherData[i].priceNegotiable,
+            image,
+          });
+        }
+      }
+    }
+
     res.json({
       id: Ad._id,
       title: Ad.title,
@@ -185,7 +214,61 @@ module.exports = {
         email: userInfo.email,
       },
       stateName: stateInfo.name,
+      others,
     });
   },
-  editAction: async (req, res) => {},
+  editAction: async (req, res) => {
+    let { id } = req.params;
+    let { title, status, price, priceneg, desc, cat, images, token } = req.body;
+
+    if (id.length < 12) {
+      res.json({ error: "ID invalido" });
+      return;
+    }
+
+    const ad = await Ad.findById(id).exec();
+    if (!ad) {
+      res.json({ error: "Anuncio não encontrado" });
+      return;
+    }
+
+    const user = await User.findOne({ token }).exec();
+    if (user._id.toString() !== ad.idUser) {
+      res.json({ error: "Não é o propietario do anuncio" });
+      return;
+    }
+
+    let updates = {};
+
+    if (title) {
+      updates.title = title;
+    }
+    if (price) {
+      price = price.replace(".", "").replace(",", ".").replace("R$ ", "");
+      price = parseFloat(price);
+      updates.price = price;
+    }
+    if (priceneg) {
+      updates.priceNegoriable = priceneg;
+    }
+    if (status) {
+      updates.status = status;
+    }
+    if (desc) {
+      updates.description = desc;
+    }
+    if (cat) {
+      const category = await Category.findOne({ slug: cat }).exec();
+      if (!category) {
+        res.json({ error: "Categoria não existe" });
+      }
+      updates.category = categori._id.toString();
+    }
+    if (images) {
+      updates.images = images;
+    }
+    await Ad.findByIdAndUpdate(id, { $set: updates });
+
+    res.json({ error: "" });
+  },
 };
