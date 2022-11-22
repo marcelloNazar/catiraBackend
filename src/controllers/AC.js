@@ -1,11 +1,10 @@
 const { v4: uuid } = require("uuid");
 const jimp = require("jimp");
-const mongoose = require("mongoose");
 
 const Category = require("../models/Category");
 const User = require("../models/User");
 const Ad = require("../models/Ad");
-const StateModel = require("../models/State");
+const State = require("../models/State");
 
 const addImage = async (buffer) => {
   let newName = `${uuid()}.jpg`;
@@ -19,6 +18,7 @@ module.exports = {
     const cats = await Category.find();
 
     let categories = [];
+
     for (let i in cats) {
       categories.push({
         ...cats[i]._doc,
@@ -33,18 +33,7 @@ module.exports = {
     const user = await User.findOne({ token }).exec();
 
     if (!title || !cat) {
-      res.json({ error: "Titulo e/ou categoria não foram preenchidos" });
-      return;
-    }
-
-    if (cat.length < 12) {
-      res.json({ error: "ID de categoria inválido" });
-      return;
-    }
-
-    const category = await Category.findById(cat);
-    if (!category) {
-      res.json({ error: "Categoria inexistente" });
+      res.json({ error: "Titulo e/ou categoria não foram preechidos" });
       return;
     }
 
@@ -81,7 +70,7 @@ module.exports = {
           });
         }
       } else {
-        for (let i = 0; i < req.files.img.length; i++) {
+        for (leti = 0; i < req.files.img.length; i++) {
           if (
             ["image/jpeg", "image/jpg", "image/png"].includes(
               req.files.img[i].mimetype
@@ -95,10 +84,9 @@ module.exports = {
           }
         }
       }
-    }
-
-    if (newAd.images.length > 0) {
-      newAd.images[0].default = true;
+      if (newAd.images.length > 0) {
+        newAd.images[0].default = true;
+      }
     }
 
     const info = await newAd.save();
@@ -112,16 +100,14 @@ module.exports = {
     if (q) {
       filters.title = { $regex: q, $options: "i" };
     }
-
     if (cat) {
       const c = await Category.findOne({ slug: cat }).exec();
       if (c) {
         filters.category = c._id.toString();
       }
     }
-
     if (state) {
-      const s = await StateModel.findOne({ name: state.toUpperCase() }).exec();
+      const s = await State.findOne({ name: state.toUpperCase() }).exec();
       if (s) {
         filters.state = s._id.toString();
       }
@@ -131,15 +117,13 @@ module.exports = {
     total = adsTotal.length;
 
     const adsData = await Ad.find(filters)
-      .sort({ dateCreated: sort == "desc" ? -1 : 1 })
+      .sort({ dateCreated: (sort = "desc" ? -1 : 1) })
       .skip(parseInt(offset))
       .limit(parseInt(limit))
       .exec();
-
     let ads = [];
     for (let i in adsData) {
       let image;
-
       let defaultImg = adsData[i].images.find((e) => e.default);
       if (defaultImg) {
         image = `${process.env.BASE}/media/${defaultImg.url}`;
@@ -155,7 +139,6 @@ module.exports = {
         image,
       });
     }
-
     res.json({ ads, total });
   },
   getItem: async (req, res) => {
@@ -167,14 +150,12 @@ module.exports = {
     }
 
     if (id.length < 12) {
-      res.json({ error: "ID inválido" });
+      res.json({ error: "ID invalido" });
       return;
     }
-
     const ad = await Ad.findById(id);
     if (!ad) {
       res.json({ error: "Produto inexistente" });
-      return;
     }
 
     ad.views++;
@@ -190,6 +171,7 @@ module.exports = {
     let stateInfo = await StateModel.findById(ad.state).exec();
 
     let others = [];
+
     if (other) {
       const otherData = await Ad.find({
         status: true,
@@ -207,7 +189,8 @@ module.exports = {
 
           others.push({
             id: otherData[i]._id,
-            title: otherData[i].title,
+            title: otherData[i]._title,
+            price: otherData[i].price,
             price: otherData[i].price,
             priceNegotiable: otherData[i].priceNegotiable,
             image,
@@ -217,13 +200,13 @@ module.exports = {
     }
 
     res.json({
-      id: ad._id,
-      title: ad.title,
-      price: ad.price,
-      priceNegotiable: ad.priceNegotiable,
-      description: ad.description,
-      dateCreated: ad.dateCreated,
-      views: ad.views,
+      id: Ad._id,
+      title: Ad.title,
+      price: Ad.price,
+      priceNegotiable: Ad.priceNegotiable,
+      description: Ad.description,
+      dateCreated: Ad.dateCreated,
+      views: Ad.views,
       images,
       category,
       userInfo: {
@@ -239,19 +222,19 @@ module.exports = {
     let { title, status, price, priceneg, desc, cat, images, token } = req.body;
 
     if (id.length < 12) {
-      res.json({ error: "ID inválido" });
+      res.json({ error: "ID invalido" });
       return;
     }
 
     const ad = await Ad.findById(id).exec();
     if (!ad) {
-      res.json({ error: "Anúncio inexistente" });
+      res.json({ error: "Anuncio não encontrado" });
       return;
     }
 
     const user = await User.findOne({ token }).exec();
     if (user._id.toString() !== ad.idUser) {
-      res.json({ error: "Este anúncio não é seu" });
+      res.json({ error: "Não é o propietario do anuncio" });
       return;
     }
 
@@ -261,13 +244,12 @@ module.exports = {
       updates.title = title;
     }
     if (price) {
-      // R$ 8.000,35 = 8000.35
       price = price.replace(".", "").replace(",", ".").replace("R$ ", "");
       price = parseFloat(price);
       updates.price = price;
     }
     if (priceneg) {
-      updates.priceNegotiable = priceneg;
+      updates.priceNegoriable = priceneg;
     }
     if (status) {
       updates.status = status;
@@ -278,52 +260,14 @@ module.exports = {
     if (cat) {
       const category = await Category.findOne({ slug: cat }).exec();
       if (!category) {
-        res.json({ error: "Categoria inexistente" });
-        return;
+        res.json({ error: "Categoria não existe" });
       }
-      updates.category = category._id.toString();
+      updates.category = categori._id.toString();
     }
-
     if (images) {
       updates.images = images;
     }
-
     await Ad.findByIdAndUpdate(id, { $set: updates });
-
-    if (req.files && req.files.img) {
-      const adI = await Ad.findById(id);
-
-      if (req.files.img.length == undefined) {
-        if (
-          ["image/jpeg", "image/jpg", "image/png"].includes(
-            req.files.img.mimetype
-          )
-        ) {
-          let url = await addImage(req.files.img.data);
-          adI.images.push({
-            url,
-            default: false,
-          });
-        }
-      } else {
-        for (let i = 0; i < req.files.img.length; i++) {
-          if (
-            ["image/jpeg", "image/jpg", "image/png"].includes(
-              req.files.img[i].mimetype
-            )
-          ) {
-            let url = await addImage(req.files.img[i].data);
-            adI.images.push({
-              url,
-              default: false,
-            });
-          }
-        }
-      }
-
-      adI.images = [...adI.images];
-      await adI.save();
-    }
 
     res.json({ error: "" });
   },
